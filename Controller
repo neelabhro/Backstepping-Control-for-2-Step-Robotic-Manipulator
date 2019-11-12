@@ -1,0 +1,55 @@
+function [e,r,Tau,V,ei] = controller(t,q,q_dot,I)
+
+c2=cos(q(2));
+s2=sin(q(2));
+alpha=0.5;
+k=0.5;
+
+p1=3.473;
+p2=0.196;
+p3=0.242;
+fd1=5.3;
+fd2=1.1;
+
+Ki = eye(2);
+Kb = eye(2);
+L  = eye(2);
+R  = eye(2);
+
+
+
+qd=[5*sin(t);10*cos(t)];
+qd_dot=[5*cos(t);-10*sin(t)];
+qd_ddot=[-5*sin(t);-10*cos(t)];
+qd_dddot=[-5*cos(t);10*sin(t)];
+e=q-qd;     %Tracking Error
+e_dot=q_dot-qd_dot;
+r=e_dot+alpha*e;
+
+M=[p1+2*p3*c2 p2+p3*c2;p2+p3*c2 p2];% Inertia matrix
+M_dot = [-2*p3*s2 -p3*s2;-p3*s2 0];
+M_ddot = [-2*p3*c2 -p3*c2;-p3*c2 0];
+
+Vm=[-p3*s2*q_dot(2) -p3*s2*(q_dot(1)+q_dot(2));p3*s2*q_dot(1) 0];%Centripetal coriolis matrix
+
+fd=[fd1 0;0 fd2]; % Friction matrix
+Tau=-k*r+Vm*q_dot+fd*q_dot+M*qd_ddot-alpha*M*e_dot-Vm*r-e; 
+%Tau = Ki*I;
+q_dot_dot=-M\(Vm*q_dot+fd*q_dot-Tau);
+Vm_dot = [-p3*(c2*q_dot(2) + s2*q_dot_dot(2)) -p3*s2*(q_dot_dot(1)+q_dot_dot(2))-p3*c2*(q_dot(1)+q_dot(2));p3*(s2*q_dot_dot(1) + c2*q_dot(1)) 0];
+e_ddot = q_dot_dot - qd_ddot;
+
+         %Filtered Tracking Error
+r_dot = e_ddot + alpha*e_dot;
+
+%----------------------------------------------------------%
+
+
+
+        % Controller
+Id = inv(Ki)*(Vm*q_dot + fd*q_dot + M*qd_ddot - alpha*M*e_dot - 0.5*M_dot*r - k*r - e);
+Id_dot = inv(Ki)*((Vm*q_dot_dot + Vm_dot*q_dot) + (fd*q_dot_dot) + (M_dot*qd_ddot + M*qd_dddot) - alpha*(M*e_ddot + M_dot*e_dot) - 0.5*(M_ddot*r + M_dot*r_dot) - k*r_dot - e_dot) ;
+ei = I - Id;
+V = L*Id_dot + R*I + Kb*q_dot;
+%V = L*Id_dot + R*I + Kb*q_dot - Ke*ei - Ki*r;
+%wb0706L0782 sushanto  
